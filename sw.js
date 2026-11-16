@@ -1,5 +1,5 @@
 // Roof Wire offline cache. Bump VERSION whenever any app file changes.
-const VERSION = "roofwire-563202c2e1";
+const VERSION = "roofwire-f839756e0b";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./vendor/jspdf.umd.min.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/apple-touch-icon.png", "./icons/favicon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });

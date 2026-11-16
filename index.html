@@ -149,6 +149,18 @@ h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:13px;letter-s
   .mlist button.mi{flex:none;max-width:180px}
   .mcanvas{min-height:320px}
   .mside{border-left:0;border-top:1px solid var(--line);overflow:visible}}
+.folds{display:flex;flex-direction:column;gap:6px}
+.fold{border:1px solid var(--line);border-radius:8px;background:var(--raise)}
+.fold>summary{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;list-style:none;border-radius:8px;min-height:42px}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary .ft{font-family:var(--f-display);font-weight:600;font-size:14.5px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.fold>summary .fs{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fold>summary .fs.warn{color:var(--warn)}
+.fold>summary svg{flex:none;width:14px;height:14px;color:var(--muted);transition:transform .15s}
+.fold[open]>summary svg{transform:rotate(90deg)}
+.fold[open]>summary{border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}
+.fold>summary:hover .ft{color:var(--accent)}
+.fold .fbody{padding:12px}
 .sechead{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .tile{position:relative}
 .tile .rmx{position:absolute;top:2px;right:3px;font-size:11px;line-height:1;padding:3px 5px;border-radius:4px;color:var(--muted)}
@@ -801,7 +813,9 @@ function countsHTML(){const gs=groups(),sv=P.items.filter(i=>TYPES[i.type].surve
   if(sv.length){const c={};sv.forEach(i=>{const k=i.res||"";c[k]=(c[k]||0)+1});x=`<div class="sec"><h3>Core cuts & moisture</h3><table class="counts">${["wet","damp","dry",""].filter(k=>c[k]).map(k=>`<tr><td>${k?RESULTS[k].label:"Result not set"}</td><td class="n">×${c[k]}</td></tr>`).join("")}</table></div>`}
   if(!gs.length)return x;
   return x+`<div class="sec"><h3>Takeoff counts</h3><table class="counts">${gs.map(g=>{const t=TYPES[g.type];return `<tr><td><span class="code">${t.code}</span>${esc(t.name)} ${esc(sizeLabel(g.type,g.w,g.h))}<div class="sub">${byStr(g.by)}</div></td><td class="n">×${g.count}</td></tr>`}).join("")}</table></div>`}
-function panelRoof(){const o=P.outline,st=roofStats();let h=`<div class="sec"><h3>Roof outline</h3>`;
+let openSec={};try{openSec=JSON.parse(localStorage.getItem("rw-folds")||"{}")||{}}catch(e){}
+function foldOpen(key,title,sum,force,warn){return `<details class="fold" data-fold="${key}" ${openSec[key]||force?"open":""}><summary><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg><span class="ft">${title}</span><span class="fs${warn?" warn":""}">${sum}</span></summary><div class="sec fbody">`}
+function panelRoof(){const o=P.outline,st=roofStats();let h=`<div class="folds">`+foldOpen("outline","Roof outline",st?`${fmtInt(st.area)} sf · ${fmtInt(st.per)} lf`:o.pts.length?"Not closed":"Not traced",mode==="outline"||!o.closed,!st);
   if(st)h+=`<div class="stats"><div><span>Area</span><b>${fmtInt(st.area)} sf</b></div><div><span>Squares</span><b>${st.squares.toFixed(1)}</b></div><div><span>Perimeter</span><b>${fmtInt(st.per)} lf</b></div><div><span>Edges</span><b>${st.edges}</b></div></div><p class="hint">In Select mode, drag the yellow corners to fine-tune.</p>`;
   else if(o.pts.length)h+=`<p class="hint">${o.pts.length} corner${o.pts.length>1?"s":""} placed. Tap the first corner to close the outline.</p>`;
   else h+=`<p class="hint">Tap each roof corner on the photo. Step-downs and L-shapes are fine; just follow the edge.</p>`;
@@ -809,35 +823,36 @@ function panelRoof(){const o=P.outline,st=roofStats();let h=`<div class="sec"><h
   if(!o.pts.length)h+=`<button class="btn primary" data-act="trace">Trace outline</button>`;
   if(o.pts.length&&!o.closed){h+=`<button class="btn" data-act="trace">Keep tracing</button>`;if(o.pts.length>=3)h+=`<button class="btn primary" data-act="closeol">Close outline</button>`;h+=`<button class="btn" data-act="popPt">Remove last corner</button>`}
   if(o.pts.length)h+=`<button class="btn danger" data-act="clearol">${delArm==="ol"?"Tap again to clear":"Clear outline"}</button>`;
-  h+=`</div></div>`;
-  const s=P.scale;h+=`<div class="sec"><h3>Scale</h3>`;
+  h+=`</div></div></details>`;
+  const s=P.scale;h+=foldOpen("scale","Scale",s.set?`1 ft = ${trim((1/s.ftPerPx).toFixed(1))} px`:"Not set",mode==="scale"||!s.set,!s.set);
   h+=s.set?`<p class="hint num">1 ft = ${trim(1/s.ftPerPx)} px · ${esc(s.note||"")}</p>`:`<div class="note-warn">Scale not set. Mark a length you know, like a tape-measured wall or a 3' parapet cap section.</div>`;
   if(mode==="scale"&&scaleDraft.p2){const px=Math.hypot(scaleDraft.p2.x-scaleDraft.p1.x,scaleDraft.p2.y-scaleDraft.p1.y);
     h+=`<div class="card"><p class="hint">Line is ${trim(px)} px on the photo. How long is it in real life?</p><div class="row"><div class="fld"><label for="sc-ft">Feet</label><input id="sc-ft" class="num" type="number" inputmode="decimal" min="0" step="1" placeholder="40"></div><div class="fld"><label for="sc-in">Inches</label><input id="sc-in" class="num" type="number" inputmode="decimal" min="0" max="11.99" step="1" placeholder="0"></div><button class="btn primary" data-act="applyScale">Apply</button></div><button class="btn ghost" data-act="redoScale">Pick new points</button></div>`}
   else if(mode==="scale")h+=`<p class="hint">Tap both ends of the known length on the photo.</p><div class="wrapbtns"><button class="btn" data-act="cancelScale">Cancel</button></div>`;
   else h+=`<div class="wrapbtns"><button class="btn" data-act="goscale">${s.set?"Reset scale":"Set scale"}</button></div>`;
-  h+=`<p class="hint">Scale is only accurate on straight-down photos. Angled shots stretch the far side of the roof.</p></div>`;
-  {const et=edgeTotals();h+=`<div class="sec"><h3>Edges & flashing</h3>`;
+  h+=`<p class="hint">Scale is only accurate on straight-down photos. Angled shots stretch the far side of the roof.</p></div></details>`;
+  {const et=edgeTotals();const setLF=et?et.tot.parapet+et.tot.metal+et.tot.wall:0;h+=foldOpen("edges","Edges & flashing",!et?"Trace roof first":setLF?(et.tot.none>.5?`${fmtInt(setLF)} of ${fmtInt(setLF+et.tot.none)} lf`:`${fmtInt(setLF)} lf set`):"No edges set");
     if(!et)h+=`<p class="hint">Close the roof outline first, then tap each edge to mark it as parapet, edge metal or a wall tie-in.</p>`;
     else{h+=`<table class="counts">${Object.entries(ETYPES).map(([k,v])=>`<tr><td><span class="swatch" style="background:${v.c}"></span>${v.label}${k==="parapet"&&et.tot[k]?`<div class="sub">Coping and base flashing ${fmtInt(et.tot[k])} lf${et.flash(k)?` · approx. ${fmtInt(et.flash(k))} sf flashing`:""}</div>`:""}</td><td class="n">${fmtInt(et.tot[k])} lf</td></tr>`).join("")}<tr><td><span class="swatch" style="background:${OUTLINE_C}"></span>Not set</td><td class="n">${fmtInt(et.tot.none)} lf</td></tr></table>
       <p class="hint">Tap a roof edge on the photo to set its type and height.</p><div class="wrapbtns"><button class="btn sm" data-act="eall" data-v="parapet">All edges: parapet</button><button class="btn sm" data-act="eall" data-v="metal">All edges: edge metal</button><button class="btn sm" data-act="enav" data-v="1">Step through edges</button><button class="btn sm" data-act="openmetal">Edge metal drawings (${(P.profiles||[]).length})</button></div>`}
-    h+=`</div>`}
-  {const ws=doneWalks(),d=draftG();let tl=0,tp=0;ws.forEach(g=>{const wi=walkInfo(g);tl+=wi.len;tp+=wi.pads.length});h+=`<div class="sec"><h3>Walkway pads</h3>`;
+    h+=`</div></details>`}
+  {const ws=doneWalks(),d=draftG();let tl=0,tp=0;ws.forEach(g=>{const wi=walkInfo(g);tl+=wi.len;tp+=wi.pads.length});h+=foldOpen("walk","Walkway pads",ws.length?`${tp} pads · ${fmtInt(tl)} lf`:"None",mode==="walk");
     if(ws.length)h+=`<div class="stats"><div><span>Pad runs</span><b>${fmtInt(tl)} lf</b></div><div><span>Pads</span><b>${tp}</b></div></div><table class="counts">${ws.map(g=>{const wi=walkInfo(g);return `<tr data-act="selG" data-id="${g.id}" style="cursor:pointer"><td><span class="code">${runTag(g)}</span>${+g.pad||30}" pads · ${fmtInt(wi.len)} lf</td><td class="n">${wi.pads.length} pads</td></tr>`}).join("")}</table>`;
     else if(!(d&&d.kind==="walk"))h+=`<p class="hint">Draw pad paths from the hatch to equipment. Tap each turn, then tap the last point again to finish.</p>`;
     h+=`<div class="wrapbtns">`;if(mode==="walk"){if(d&&d.pts.length>=2)h+=`<button class="btn primary" data-act="gfinish">Finish run</button>`;if(d&&d.pts.length)h+=`<button class="btn" data-act="gpop">Remove last point</button>`;h+=`<button class="btn" data-act="gstop">Done drawing</button>`}
-    else h+=`<button class="btn" data-act="wdraw">Draw walkway</button>`;h+=`</div></div>`}
-  {const cts=closedTapers(),d=draftT(),tot=cts.reduce((a,t)=>a+tStats(t).area,0);h+=`<div class="sec"><h3>Sloped insulation</h3>`;
+    else h+=`<button class="btn" data-act="wdraw">Draw walkway</button>`;h+=`</div></div></details>`}
+  {const cts=closedTapers(),d=draftT(),tot=cts.reduce((a,t)=>a+tStats(t).area,0);h+=foldOpen("taper","Sloped insulation",cts.length?`${fmtInt(tot)} sf · ${cts.length} area${cts.length>1?"s":""}`:"None",mode==="taper");
     if(cts.length)h+=`<div class="stats"><div><span>Sloped area</span><b>${fmtInt(tot)} sf</b></div><div><span>Areas</span><b>${cts.length}</b></div></div><table class="counts">${cts.map(t=>`<tr data-act="selT" data-id="${t.id}" style="cursor:pointer"><td><span class="code" style="color:${PINK}">${taperTag(t)}</span>${esc(t.name)}${t.slope?` · ${esc(t.slope)}"/ft`:""}</td><td class="n">${fmtInt(tStats(t).area)} sf</td></tr>`).join("")}</table>`;
     else if(!d)h+=`<p class="hint">Trace crickets, saddles and tapered areas in pink. Tap each corner, then tap the first corner to close.</p>`;
     h+=`<div class="wrapbtns">`;if(mode==="taper"){if(d&&d.pts.length>=3)h+=`<button class="btn primary" data-act="tclose">Close area</button>`;if(d&&d.pts.length)h+=`<button class="btn" data-act="tpop">Remove last corner</button>`;h+=`<button class="btn" data-act="tstop">Done drawing</button>`}
-    else h+=`<button class="btn" data-act="tdraw" style="border-color:${PINK}">Draw sloped area</button>`;h+=`</div></div>`}
-  {const gs=doneGas(),d0=draftG(),d=d0&&d0.kind!=="walk"?d0:null;let tl=0,tb=0;gs.forEach(g=>{const gi=gasInfo(g);tl+=gi.len;tb+=gi.blocks.length});h+=`<div class="sec"><h3>Gas lines</h3>`;
+    else h+=`<button class="btn" data-act="tdraw" style="border-color:${PINK}">Draw sloped area</button>`;h+=`</div></div></details>`}
+  {const gs=doneGas(),d0=draftG(),d=d0&&d0.kind!=="walk"?d0:null;let tl=0,tb=0;gs.forEach(g=>{const gi=gasInfo(g);tl+=gi.len;tb+=gi.blocks.length});h+=foldOpen("gas","Gas lines",gs.length?`${fmtInt(tl)} lf · ${tb} blocks`:"None",mode==="gas");
     if(gs.length)h+=`<div class="stats"><div><span>Gas line</span><b>${fmtInt(tl)} lf</b></div><div><span>Support blocks</span><b>${tb}</b></div></div><table class="counts">${gs.map(g=>{const gi=gasInfo(g);return `<tr data-act="selG" data-id="${g.id}" style="cursor:pointer"><td><span class="code" style="color:#a16207">${gasTag(g)}</span>${esc(g.size)} gas · ${gi.blocks.length} blocks<div class="sub">${STATUS[g.status].label}</div></td><td class="n">${fmtInt(gi.len)} lf</td></tr>`}).join("")}</table>`;
     else if(!d)h+=`<p class="hint">Draw gas piping that runs on blocks. Tap each bend, then tap the last point again to finish. Support blocks are spaced along the run automatically.</p>`;
     h+=`<div class="wrapbtns">`;if(mode==="gas"){if(d&&d.pts.length>=2)h+=`<button class="btn primary" data-act="gfinish">Finish line</button>`;if(d&&d.pts.length)h+=`<button class="btn" data-act="gpop">Remove last point</button>`;h+=`<button class="btn" data-act="gstop">Done drawing</button>`}
-    else h+=`<button class="btn" data-act="gdraw" style="border-color:#eab308">Draw gas line</button>`;h+=`</div></div>`}
-  h+=countsHTML();return h}
+    else h+=`<button class="btn" data-act="gdraw" style="border-color:#eab308">Draw gas line</button>`;h+=`</div></div></details>`}
+  {const c=countsHTML(),n=P.items.filter(i=>TYPES[i.type]&&!TYPES[i.type].survey).length;if(c)h+=foldOpen("counts","Symbol counts",`${n} symbol${n===1?"":"s"}`)+c+`</div></details>`}
+  return h+`</div>`}
 function specHTML(){const S=getSpec(),M=MFR[S.mfr],mt=calcMaterials();const num=(k,label,step="any",unit="")=>`<div class="fld"><label for="sp-${k}">${label}</label><input id="sp-${k}" class="num" type="number" inputmode="decimal" step="${step}" min="0" value="${trim(S[k])}" data-spec="${k}"></div>`;
   let h=`<div class="sec"><h3>Roof system & materials</h3>
   <div class="seg" role="group" aria-label="Manufacturer">${Object.entries(MFR).map(([k,v])=>`<button data-act="mfr" data-v="${k}" class="${S.mfr===k?"on":""}">${v.label}</button>`).join("")}</div>
@@ -949,6 +964,7 @@ $("#tabbody").addEventListener("click",async e=>{
     case "openFile":$("#fileProject").click();break;
   }
 });
+$("#tabbody").addEventListener("click",e=>{const sm=e.target.closest(".fold>summary");if(!sm)return;const d=sm.parentElement;openSec[d.dataset.fold]=!d.open;try{localStorage.setItem("rw-folds",JSON.stringify(openSec))}catch(_){}});
 let editCommitted=false;
 $("#tabbody").addEventListener("focusin",()=>{editCommitted=false});
 $("#tabbody").addEventListener("input",e=>{const el=e.target;const once=()=>{if(!editCommitted){commit();editCommitted=true}};
